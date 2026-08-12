@@ -69,79 +69,17 @@ RUN pip install --no-cache-dir /tmp/torch-*.whl /tmp/torchvision-*.whl /tmp/torc
 # -----------------------------------------------------------------------------
 # 6. Clone Repository
 # -----------------------------------------------------------------------------
-RUN git clone https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1.git /workspace/Hunyuan3D-2.1
+RUN git clone https://github.com/bucknerbg27/Hunyuan3D-2.1.git /workspace/Hunyuan3D-2.1
 WORKDIR /workspace/Hunyuan3D-2.1
 
-# Fix MAX_SEED float -> int for Python 3.12
-RUN sed -i 's/MAX_SEED = 1e7/MAX_SEED = 10000000/' gradio_app.py
-
 # -----------------------------------------------------------------------------
-# 7. Fix bpy -> trimesh
-# -----------------------------------------------------------------------------
-RUN <<'PYEOF' python3
-import re
-with open('hy3dpaint/DifferentiableRenderer/mesh_utils.py', 'r') as f:
-    content = f.read()
-content = re.sub(r'^import bpy\n', '', content, flags=re.MULTILINE)
-old = '''def convert_obj_to_glb(
-    obj_path: str,
-    glb_path: str,
-    shade_type: str = "SMOOTH",
-    auto_smooth_angle: float = 60,
-    merge_vertices: bool = False,
-) -> bool:
-    """Convert OBJ file to GLB format using Blender."""
-    try:
-        _setup_blender_scene()
-        _clear_scene_objects()
-        bpy.ops.wm.obj_import(filepath=obj_path)
-        _select_mesh_objects()
-        _merge_vertices_if_needed(merge_vertices)
-        _apply_shading(shade_type, auto_smooth_angle)
-        bpy.ops.export_scene.gltf(filepath=glb_path, use_active_scene=True)
-        return True
-    except Exception:
-        return False'''
-new = '''def convert_obj_to_glb(
-    obj_path: str,
-    glb_path: str,
-    shade_type: str = "SMOOTH",
-    auto_smooth_angle: float = 60,
-    merge_vertices: bool = False,
-) -> bool:
-    """Convert OBJ file to GLB format using trimesh."""
-    try:
-        import trimesh
-        mesh = trimesh.load(obj_path)
-        if mesh is None:
-            return False
-        mesh.export(glb_path)
-        return True
-    except Exception:
-        return False'''
-content = content.replace(old, new)
-with open('hy3dpaint/DifferentiableRenderer/mesh_utils.py', 'w') as f:
-    f.write(content)
-print('Patched mesh_utils.py successfully')
-PYEOF
-
-# -----------------------------------------------------------------------------
-# 8. Install Python Dependencies
+# 7. Install Python Dependencies
 # -----------------------------------------------------------------------------
 RUN pip install --no-cache-dir wheel setuptools pybind11
-RUN sed -i '/^bpy/d' requirements.txt
-RUN sed -i 's/numpy==1.24.4/numpy>=1.26.0/' requirements.txt
-RUN sed -i 's/open3d==0.18.0/open3d>=0.19.0/' requirements.txt
-RUN sed -i '/^pymeshlab/d' requirements.txt
-RUN sed -i 's/[<>=!]=.*//' requirements.txt
-RUN sed -i '/^--extra-index-url/d' requirements.txt
-RUN sed -i '/^$/d' requirements.txt
 RUN pip install --no-cache-dir ninja
 RUN pip install --no-cache-dir einops
 RUN pip install --no-cache-dir rembg
 RUN pip install --no-cache-dir realesrgan
-# Fix: set half=False in image_super_utils.py (model is fp32, input must match)
-RUN sed -i 's/half=True/half=False/' hy3dpaint/utils/image_super_utils.py
 RUN pip install --no-cache-dir gradio
 RUN pip install --no-cache-dir cupy-cuda12x
 RUN pip install --no-cache-dir onnxruntime
@@ -158,7 +96,7 @@ COPY wheels/ /tmp/wheels/
 RUN pip install --no-cache-dir --find-links /tmp/wheels/ -r requirements.txt
 
 # -----------------------------------------------------------------------------
-# 9. Pre-built CUDA extensions (from ComfyUI-3D-Pack)
+# 8. Pre-built CUDA extensions (from ComfyUI-3D-Pack)
 # -----------------------------------------------------------------------------
 # Build custom_rasterizer from source (against CUDA 13)
 RUN cd hy3dpaint/custom_rasterizer && \
@@ -169,22 +107,9 @@ RUN cd hy3dpaint/custom_rasterizer && \
 # Build DifferentiableRenderer from source
 RUN cd hy3dpaint/DifferentiableRenderer && \
     bash compile_mesh_painter.sh
-# Fix: add trust_remote_code=True for custom pipeline loading
-RUN <<'PYEOF' python3
-path = 'hy3dpaint/utils/multiview_utils.py'
-with open(path, 'r') as f:
-    content = f.read()
-content = content.replace(
-    'torch_dtype=torch.float16\n        )',
-    'torch_dtype=torch.float16,\n            trust_remote_code=True\n        )'
-)
-with open(path, 'w') as f:
-    f.write(content)
-print('Patched multiview_utils.py successfully')
-PYEOF
 
 # -----------------------------------------------------------------------------
-# 10. Patch realesrgan to skip fp16
+# 9. Patch realesrgan to skip fp16
 # -----------------------------------------------------------------------------
 RUN <<'PYEOF' python3
 path = '/workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/realesrgan/utils.py'
@@ -197,19 +122,13 @@ print('Patched realesrgan/utils.py successfully')
 PYEOF
 
 # -----------------------------------------------------------------------------
-# 11. RealESRGAN Weights
+# 10. RealESRGAN Weights
 # -----------------------------------------------------------------------------
 RUN mkdir -p hy3dpaint/ckpt && \
     wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -P hy3dpaint/ckpt
 
 # -----------------------------------------------------------------------------
-# 12. Patch Configuration Paths
-# -----------------------------------------------------------------------------
-RUN sed -i 's/self\.multiview_cfg_path = "cfgs\/hunyuan-paint-pbr\.yaml"/self.multiview_cfg_path = "hy3dpaint\/cfgs\/hunyuan-paint-pbr.yaml"/' hy3dpaint/textureGenPipeline.py && \
-    sed -i 's/custom_pipeline = config\.custom_pipeline/custom_pipeline = os.path.join(os.path.dirname(__file__),"..","hunyuanpaintpbr")/' hy3dpaint/utils/multiview_utils.py
-
-# -----------------------------------------------------------------------------
-# 13. Final Setup
+# 11. Final Setup
 # -----------------------------------------------------------------------------
 RUN mkdir -p gradio_cache && echo "conda activate hunyuan3d21" >> ~/.bashrc
 RUN ln -sf /usr/local/cuda/lib64/libcudart.so.13.0 /usr/local/cuda/lib64/libcudart.so.12 && \
