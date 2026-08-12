@@ -109,20 +109,7 @@ RUN cd hy3dpaint/DifferentiableRenderer && \
     bash compile_mesh_painter.sh
 
 # -----------------------------------------------------------------------------
-# 9. Patch realesrgan to skip fp16
-# -----------------------------------------------------------------------------
-RUN <<'PYEOF' python3
-path = '/workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/realesrgan/utils.py'
-with open(path, 'r') as f:
-    content = f.read()
-content = content.replace('self.model = self.model.half()', 'pass  # disabled for Blackwell')
-with open(path, 'w') as f:
-    f.write(content)
-print('Patched realesrgan/utils.py successfully')
-PYEOF
-
-# -----------------------------------------------------------------------------
-# 10. RealESRGAN Weights
+# 9. RealESRGAN Weights
 # -----------------------------------------------------------------------------
 RUN mkdir -p hy3dpaint/ckpt && \
     wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -P hy3dpaint/ckpt
