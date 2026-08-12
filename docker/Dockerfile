@@ -49,11 +49,7 @@ RUN conda config --add channels conda-forge && conda config --set channel_priori
 RUN conda create -n hunyuan3d21 python=3.12 -c conda-forge -y && conda clean -a -y
 
 ENV PATH="/workspace/miniconda3/envs/hunyuan3d21/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/workspace/miniconda3/envs/hunyuan3d21/lib:/opt/blender/4.0/python/lib:${LD_LIBRARY_PATH}"
-
-RUN echo "/opt/blender/4.0/scripts/modules" > /workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/blender.pth && \
-    echo "/opt/blender/4.0/python/lib/python3.10" >> /workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/blender.pth && \
-    echo "/opt/blender/4.0/python/lib/python3.10/site-packages" >> /workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/blender.pth
+ENV LD_LIBRARY_PATH="/workspace/miniconda3/envs/hunyuan3d21/lib:${LD_LIBRARY_PATH}"
 
 # -----------------------------------------------------------------------------
 # 4. Build Tools
