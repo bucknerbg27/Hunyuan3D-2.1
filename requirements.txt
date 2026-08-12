@@ -49,7 +49,7 @@ psutil==6.0.0
 cupy-cuda12x==13.4.1
 
 # ONNX Runtime
-onnxruntime==1.16.3
+onnxruntime>=1.17.0
 torchmetrics==1.6.0
 
 pydantic==2.10.6
