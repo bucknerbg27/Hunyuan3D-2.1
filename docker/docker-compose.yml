@@ -1,0 +1,29 @@
+services:
+  hunyuan3d:
+    build: .
+    image: hunyuan3d:2.1
+    container_name: Hunyaun3D2.1_App
+    ports:
+      - "8082:8080"
+    environment:
+      - GRADIO_MCP_SERVER=True  
+    volumes:
+      - J:\hunyuan_cache\huggingface:/root/.cache/huggingface
+      - J:\hunyuan_cache\hy3dgen:/root/.cache/hy3dgen
+      - J:\hunyuan_cache\output:/workspace/Hunyuan3D-2.1/gradio_cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: Hunyaun3D2.1_Tunnel
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    depends_on:
+      - hunyuan3d
+    restart: unless-stopped
