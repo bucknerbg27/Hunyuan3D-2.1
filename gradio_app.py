@@ -49,7 +49,7 @@ from hy3dshape.utils import logger
 from hy3dpaint.convert_utils import create_glb_with_pbr_materials
 
 
-MAX_SEED = 1e7
+MAX_SEED = 10000000
 ENV = "Local" # "Huggingface"
 if ENV == 'Huggingface':
     """

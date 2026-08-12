@@ -30,7 +30,7 @@ class imageSuperNet:
             tile=0,
             tile_pad=10,
             pre_pad=0,
-            half=True,
+            half=False,
             gpu_id=None,
         )
         self.upsampler = upsampler
