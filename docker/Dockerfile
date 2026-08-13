@@ -76,7 +76,11 @@ WORKDIR /workspace/Hunyuan3D-2.1
 # -----------------------------------------------------------------------------
 # 7. Install Python Dependencies
 # -----------------------------------------------------------------------------
-RUN pip install --no-cache-dir wheel "setuptools<70" pybind11
+RUN pip install --no-cache-dir wheel setuptools pybind11
+
+# setuptools>=70 removed pkg_resources, but lightning_fabric (pytorch-lightning 1.9.5) imports it.
+# Provide a minimal shim that exposes declare_namespace.
+COPY pkg_resources_shim.py /workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/pkg_resources.py
 RUN pip install --no-cache-dir ninja
 RUN pip install --no-cache-dir einops
 RUN pip install --no-cache-dir rembg
