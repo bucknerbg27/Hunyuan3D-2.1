@@ -76,7 +76,7 @@ WORKDIR /workspace/Hunyuan3D-2.1
 # -----------------------------------------------------------------------------
 # 7. Install Python Dependencies
 # -----------------------------------------------------------------------------
-RUN pip install --no-cache-dir wheel setuptools pybind11
+RUN pip install --no-cache-dir wheel "setuptools<70" pybind11
 RUN pip install --no-cache-dir ninja
 RUN pip install --no-cache-dir einops
 RUN pip install --no-cache-dir rembg
