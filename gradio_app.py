@@ -229,7 +229,7 @@ def _gen_shape(
     num_chunks=200000,
     randomize_seed: bool = False,
 ):
-    if not MV_MODE and image is None and caption is None:
+    if not MV_MODE and image is None and (caption is None or caption == ""):
         raise gr.Error("Please provide either a caption or an image.")
     if MV_MODE:
         if mv_image_front is None and mv_image_back is None \
@@ -375,6 +375,11 @@ def generation_all(
     logger.info("---Face Reduction takes %s seconds ---" % (time.time() - tmp_time))
     stats['time']['face reduction'] = time.time() - tmp_time
 
+    # Offload shape model to free VRAM for texture generation
+    if args.low_vram_mode:
+        i23d_worker.maybe_free_model_hooks()
+        torch.cuda.empty_cache()
+
     tmp_time = time.time()
 
     text_path = os.path.join(save_folder, f'textured_mesh.obj')
@@ -382,6 +387,10 @@ def generation_all(
         
     logger.info("---Texture Generation takes %s seconds ---" % (time.time() - tmp_time))
     stats['time']['texture generation'] = time.time() - tmp_time
+
+    # Offload texture models to free VRAM
+    if args.low_vram_mode:
+        tex_pipeline.unload_models()
 
     tmp_time = time.time()
     # Convert textured OBJ to GLB using obj2gltf with PBR support
@@ -494,11 +503,11 @@ def build_app():
                 with gr.Tabs(selected='tab_img_prompt') as tabs_prompt:
                     with gr.Tab('Image Prompt', id='tab_img_prompt', visible=not MV_MODE) as tab_ip:
                         image = gr.Image(label='Image', type='pil', image_mode='RGBA', height=290)
-                        caption = gr.State(None)
-#                    with gr.Tab('Text Prompt', id='tab_txt_prompt', visible=HAS_T2I and not MV_MODE) as tab_tp:
-#                        caption = gr.Textbox(label='Text Prompt',
-#                                             placeholder='HunyuanDiT will be used to generate image.',
-#                                             info='Example: A 3D model of a cute cat, white background')
+                        _caption_state = gr.State(None)
+                    with gr.Tab('Text Prompt', id='tab_txt_prompt', visible=HAS_T2I and not MV_MODE) as tab_tp:
+                        caption = gr.Textbox(label='Text Prompt',
+                                             placeholder='SDXL-Turbo will be used to generate image.',
+                                             info='Example: A 3D model of a cute cat, white background')
                     with gr.Tab('MultiView Prompt', visible=MV_MODE) as tab_mv:
                         # gr.Label('Please upload at least one front image.')
                         with gr.Row():
@@ -600,10 +609,16 @@ Fast for very complex cases, Standard seldom use.',
                         with gr.Row():
                             gr.Examples(examples=example_is, inputs=[image],
                                         label=None, examples_per_page=18)
+                    with gr.Tab('Text to 3D Gallery',
+                                id='tab_txt_gallery',
+                                visible=HAS_T2I and not MV_MODE) as tab_gt:
+                        with gr.Row():
+                            gr.Examples(examples=example_ts, inputs=[caption],
+                                        label=None, examples_per_page=18)
 
         tab_ip.select(fn=lambda: gr.update(selected='tab_img_gallery'), outputs=gallery)
-        #if HAS_T2I:
-        #    tab_tp.select(fn=lambda: gr.update(selected='tab_txt_gallery'), outputs=gallery)
+        if HAS_T2I:
+            tab_tp.select(fn=lambda: gr.update(selected='tab_txt_gallery'), outputs=gallery)
 
         btn.click(
             shape_generation,
@@ -819,12 +834,18 @@ if __name__ == '__main__':
             print('Please try to install requirements by following README.md')
             HAS_TEXTUREGEN = False
 
-    HAS_T2I = True
+    HAS_T2I = False
     if args.enable_t23d:
-        from hy3dgen.text2image import HunyuanDiTPipeline
-
-        t2i_worker = HunyuanDiTPipeline('Tencent-Hunyuan/HunyuanDiT-v1.1-Diffusers-Distilled')
-        HAS_T2I = True
+        try:
+            from t2i_worker import Text2ImageWorker
+            t2i_worker = Text2ImageWorker(device=args.device)
+            t2i_worker.load()
+            HAS_T2I = True
+            print("Text-to-image worker loaded (SDXL-Turbo)")
+        except Exception as e:
+            print(f"Warning: Failed to load text-to-image worker: {e}")
+            print("Text-to-3D will be unavailable.")
+            HAS_T2I = False
 
     from hy3dshape import FaceReducer, FloaterRemover, DegenerateFaceRemover, MeshSimplifier, \
         Hunyuan3DDiTFlowMatchingPipeline
@@ -843,6 +864,10 @@ if __name__ == '__main__':
         i23d_worker.enable_flashvdm(mc_algo=mc_algo)
     if args.compile:
         i23d_worker.compile()
+
+    # Enable CPU offload on shape pipeline to free VRAM between calls
+    if args.low_vram_mode:
+        i23d_worker.enable_model_cpu_offload()
 
     floater_remove_worker = FloaterRemover()
     degenerate_face_remove_worker = DegenerateFaceRemover()

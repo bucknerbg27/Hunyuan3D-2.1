@@ -74,6 +74,7 @@ class Hunyuan3DPaintPipeline:
         self.config = config if config is not None else Hunyuan3DPaintConfig()
         self.models = {}
         self.stats_logs = {}
+        self._offloaded = False
         self.render = MeshRender(
             default_resolution=self.config.render_size,
             texture_size=self.config.texture_size,
@@ -87,11 +88,37 @@ class Hunyuan3DPaintPipeline:
         torch.cuda.empty_cache()
         self.models["super_model"] = imageSuperNet(self.config)
         self.models["multiview_model"] = multiviewDiffusionNet(self.config)
+        self._offloaded = False
         print("Models Loaded.")
+
+    def unload_models(self):
+        """Move models to CPU and free GPU memory."""
+        for key in list(self.models.keys()):
+            model = self.models[key]
+            if hasattr(model, 'pipeline') and hasattr(model.pipeline, 'to'):
+                model.pipeline = model.pipeline.to('cpu')
+            elif hasattr(model, 'to'):
+                self.models[key] = model.to('cpu')
+        self._offloaded = True
+        torch.cuda.empty_cache()
+        print("Models unloaded to CPU.")
+
+    def _ensure_gpu(self):
+        """Move models back to GPU if they were offloaded."""
+        if not self._offloaded:
+            return
+        for key, model in self.models.items():
+            if hasattr(model, 'pipeline') and hasattr(model.pipeline, 'to'):
+                model.pipeline = model.pipeline.to('cuda')
+            elif hasattr(model, 'to'):
+                self.models[key] = model.to('cuda')
+        self._offloaded = False
+        torch.cuda.empty_cache()
 
     @torch.no_grad()
     def __call__(self, mesh_path=None, image_path=None, output_mesh_path=None, use_remesh=True, save_glb=True):
         """Generate texture for 3D mesh using multiview diffusion"""
+        self._ensure_gpu()
         # Ensure image_prompt is a list
         if isinstance(image_path, str):
             image_prompt = Image.open(image_path)
