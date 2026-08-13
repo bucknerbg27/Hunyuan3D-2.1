@@ -70,8 +70,8 @@ RUN pip install --no-cache-dir /tmp/torch-*.whl /tmp/torchvision-*.whl /tmp/torc
 # -----------------------------------------------------------------------------
 # 6. Clone Repository
 # -----------------------------------------------------------------------------
-ARG CACHEBUST=0
-RUN echo "Cache bust: ${CACHEBUST}" && git clone -b dev/docker-fixes https://github.com/bucknerbg27/Hunyuan3D-2.1.git /workspace/Hunyuan3D-2.1
+RUN rm -rf /workspace/Hunyuan3D-2.1 && \
+    git clone -b dev/docker-fixes https://github.com/bucknerbg27/Hunyuan3D-2.1.git /workspace/Hunyuan3D-2.1
 WORKDIR /workspace/Hunyuan3D-2.1
 
 # -----------------------------------------------------------------------------
