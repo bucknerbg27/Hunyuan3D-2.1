@@ -245,6 +245,16 @@ class Hunyuan3DDiTPipeline:
         self.kwargs = kwargs
         self.to(device, dtype)
 
+    @property
+    def components(self) -> dict:
+        """Expose models as a dict for enable_model_cpu_offload compatibility."""
+        return {
+            "vae": self.vae,
+            "model": self.model,
+            "conditioner": self.conditioner,
+            "image_processor": self.image_processor,
+        }
+
     def compile(self):
         self.vae = torch.compile(self.vae)
         self.model = torch.compile(self.model)
