@@ -301,8 +301,8 @@ class FlowMatchEulerDiscreteScheduler(SchedulerMixin, ConfigMixin):
         # Upcast to avoid precision issues when computing prev_sample
         sample = sample.to(torch.float32)
 
-        sigma = self.sigmas[self.step_index]
-        sigma_next = self.sigmas[self.step_index + 1]
+        sigma = self.sigmas[self.step_index].to(sample.device)
+        sigma_next = self.sigmas[self.step_index + 1].to(sample.device)
 
         prev_sample = sample + (sigma_next - sigma) * model_output
 
