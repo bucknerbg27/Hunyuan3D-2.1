@@ -1,8 +1,8 @@
 services:
   hunyuan3d:
     build: .
-    image: hunyuan3d:2.1
-    container_name: Hunyaun3D2.1_App
+    image: hunyuan3d:2.1_BGB
+    container_name: Hunyaun3D2.1_App_BGB
     ports:
       - "8082:8080"
     environment:

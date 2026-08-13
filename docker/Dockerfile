@@ -49,12 +49,11 @@ RUN conda config --add channels conda-forge && conda config --set channel_priori
 RUN conda create -n hunyuan3d21 python=3.12 -c conda-forge -y && conda clean -a -y
 
 ENV PATH="/workspace/miniconda3/envs/hunyuan3d21/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/workspace/miniconda3/envs/hunyuan3d21/lib:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="/workspace/miniconda3/envs/hunyuan3d21/lib:/opt/blender/4.0/python/lib:${LD_LIBRARY_PATH}"
 
-# Blender's Python 3.10 is incompatible with Python 3.12 (pkg_resources conflict).
-# bpy was replaced with trimesh, so Blender's Python is not needed.
-# Remove it entirely to prevent sys.path contamination.
-RUN rm -rf /opt/blender/4.0/python
+RUN echo "/opt/blender/4.0/scripts/modules" > /workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/blender.pth && \
+    echo "/opt/blender/4.0/python/lib/python3.10" >> /workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/blender.pth && \
+    echo "/opt/blender/4.0/python/lib/python3.10/site-packages" >> /workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/blender.pth
 
 # -----------------------------------------------------------------------------
 # 4. Build Tools
@@ -70,13 +69,23 @@ RUN pip install --no-cache-dir /tmp/torch-*.whl /tmp/torchvision-*.whl /tmp/torc
 # -----------------------------------------------------------------------------
 # 6. Clone Repository
 # -----------------------------------------------------------------------------
-RUN git clone -b dev/docker-fixes https://github.com/bucknerbg27/Hunyuan3D-2.1.git /workspace/Hunyuan3D-2.1
+RUN git clone https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1.git /workspace/Hunyuan3D-2.1
 WORKDIR /workspace/Hunyuan3D-2.1
 
+# Fix MAX_SEED float -> int for Python 3.12
+RUN sed -i 's/MAX_SEED = 1e7/MAX_SEED = 10000000/' gradio_app.py
+
 # -----------------------------------------------------------------------------
-# 7. Install Python Dependencies
+# 8. Install Python Dependencies
 # -----------------------------------------------------------------------------
-RUN pip install --no-cache-dir wheel "setuptools<70" pybind11
+RUN pip install --no-cache-dir wheel setuptools pybind11
+RUN sed -i '/^bpy/d' requirements.txt
+RUN sed -i 's/numpy==1.24.4/numpy>=1.26.0/' requirements.txt
+RUN sed -i 's/open3d==0.18.0/open3d>=0.19.0/' requirements.txt
+RUN sed -i '/^pymeshlab/d' requirements.txt
+RUN sed -i 's/[<>=!]=.*//' requirements.txt
+RUN sed -i '/^--extra-index-url/d' requirements.txt
+RUN sed -i '/^$/d' requirements.txt
 RUN pip install --no-cache-dir ninja
 RUN pip install --no-cache-dir einops
 RUN pip install --no-cache-dir rembg
@@ -97,7 +106,7 @@ COPY wheels/ /tmp/wheels/
 RUN pip install --no-cache-dir --find-links /tmp/wheels/ -r requirements.txt
 
 # -----------------------------------------------------------------------------
-# 8. Pre-built CUDA extensions (from ComfyUI-3D-Pack)
+# 9. Pre-built CUDA extensions (from ComfyUI-3D-Pack)
 # -----------------------------------------------------------------------------
 # Build custom_rasterizer from source (against CUDA 13)
 RUN cd hy3dpaint/custom_rasterizer && \
@@ -110,13 +119,32 @@ RUN cd hy3dpaint/DifferentiableRenderer && \
     bash compile_mesh_painter.sh
 
 # -----------------------------------------------------------------------------
-# 9. RealESRGAN Weights
+# 10. Patch realesrgan to skip fp16
+# -----------------------------------------------------------------------------
+RUN <<'PYEOF' python3
+path = '/workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/realesrgan/utils.py'
+with open(path, 'r') as f:
+    content = f.read()
+content = content.replace('self.model = self.model.half()', 'pass  # disabled for Blackwell')
+with open(path, 'w') as f:
+    f.write(content)
+print('Patched realesrgan/utils.py successfully')
+PYEOF
+
+# -----------------------------------------------------------------------------
+# 11. RealESRGAN Weights
 # -----------------------------------------------------------------------------
 RUN mkdir -p hy3dpaint/ckpt && \
     wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -P hy3dpaint/ckpt
 
 # -----------------------------------------------------------------------------
-# 11. Final Setup
+# 12. Patch Configuration Paths
+# -----------------------------------------------------------------------------
+RUN sed -i 's/self\.multiview_cfg_path = "cfgs\/hunyuan-paint-pbr\.yaml"/self.multiview_cfg_path = "hy3dpaint\/cfgs\/hunyuan-paint-pbr.yaml"/' hy3dpaint/textureGenPipeline.py && \
+    sed -i 's/custom_pipeline = config\.custom_pipeline/custom_pipeline = os.path.join(os.path.dirname(__file__),"..","hunyuanpaintpbr")/' hy3dpaint/utils/multiview_utils.py
+
+# -----------------------------------------------------------------------------
+# 13. Final Setup
 # -----------------------------------------------------------------------------
 RUN mkdir -p gradio_cache && echo "conda activate hunyuan3d21" >> ~/.bashrc
 RUN ln -sf /usr/local/cuda/lib64/libcudart.so.13.0 /usr/local/cuda/lib64/libcudart.so.12 && \
