@@ -95,10 +95,7 @@ class Hunyuan3DPaintPipeline:
         """Move models to CPU and free GPU memory."""
         for key in list(self.models.keys()):
             model = self.models[key]
-            if hasattr(model, 'pipeline') and hasattr(model.pipeline, 'to'):
-                model.pipeline = model.pipeline.to('cpu')
-            elif hasattr(model, 'to'):
-                self.models[key] = model.to('cpu')
+            self._move_model_to(model, 'cpu')
         self._offloaded = True
         torch.cuda.empty_cache()
         print("Models unloaded to CPU.")
@@ -108,12 +105,25 @@ class Hunyuan3DPaintPipeline:
         if not self._offloaded:
             return
         for key, model in self.models.items():
-            if hasattr(model, 'pipeline') and hasattr(model.pipeline, 'to'):
-                model.pipeline = model.pipeline.to('cuda')
-            elif hasattr(model, 'to'):
-                self.models[key] = model.to('cuda')
+            self._move_model_to(model, 'cuda')
         self._offloaded = False
         torch.cuda.empty_cache()
+
+    @staticmethod
+    def _move_model_to(model, device):
+        """Recursively move a model and its known sub-models to a device."""
+        # Move the model itself if it has .to()
+        if hasattr(model, 'to'):
+            model.to(device)
+        # Handle multiviewDiffusionNet: move pipeline and dino_v2
+        if hasattr(model, 'pipeline') and hasattr(model.pipeline, 'to'):
+            model.pipeline.to(device)
+        if hasattr(model, 'dino_v2') and hasattr(model.dino_v2, 'to'):
+            model.dino_v2.to(device)
+        # Handle imageSuperNet: move the RealESRGAN upsampler's internal model
+        if hasattr(model, 'upsampler') and hasattr(model.upsampler, 'model'):
+            if hasattr(model.upsampler.model, 'to'):
+                model.upsampler.model.to(device)
 
     @torch.no_grad()
     def __call__(self, mesh_path=None, image_path=None, output_mesh_path=None, use_remesh=True, save_glb=True):
