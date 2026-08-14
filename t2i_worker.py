@@ -53,11 +53,11 @@ class Text2ImageWorker:
         generator = torch.Generator(device=self.device).manual_seed(seed)
         image = self.pipe(
             prompt=prompt,
-            num_inference_steps=1,  # Turbo only needs 1-4 steps
+            num_inference_steps=4,  # Turbo: 1-4 steps, 4 = best quality
             guidance_scale=0.0,     # Turbo works best without CFG
             generator=generator,
-            width=512,
-            height=512,
+            width=1024,
+            height=1024,
         ).images[0]
 
         return image.convert("RGBA")
