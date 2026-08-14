@@ -1,7 +1,7 @@
 """
-Lightweight text-to-image worker using SDXL-Turbo.
+Text-to-image worker using SDXL 1.0 base.
 
-Fits in ~5GB VRAM with model_cpu_offload. Designed to work alongside
+Fits in ~7GB VRAM with model_cpu_offload. Designed to work alongside
 the Hunyuan3D shape/texture pipelines within a 32GB budget.
 """
 import torch
@@ -10,7 +10,7 @@ from diffusers import AutoPipelineForText2Image
 
 
 class Text2ImageWorker:
-    """Text-to-image generation using SDXL-Turbo with CPU offload."""
+    """Text-to-image generation using SDXL 1.0 base with CPU offload."""
 
     def __init__(self, device: str = "cuda"):
         self.device = device
@@ -21,7 +21,7 @@ class Text2ImageWorker:
         if self.pipe is not None:
             return
         self.pipe = AutoPipelineForText2Image.from_pretrained(
-            "stabilityai/sdxl-turbo",
+            "stabilityai/stable-diffusion-xl-base-1.0",
             torch_dtype=torch.float16,
             variant="fp16",
         )
@@ -37,13 +37,20 @@ class Text2ImageWorker:
         torch.cuda.empty_cache()
 
     @torch.inference_mode()
-    def __call__(self, prompt: str, seed: int = 0, steps: int = 4) -> Image.Image:
+    def __call__(
+        self,
+        prompt: str,
+        seed: int = 0,
+        steps: int = 30,
+        guidance_scale: float = 7.5,
+    ) -> Image.Image:
         """Generate an image from a text prompt.
 
         Args:
             prompt: Text description of the desired image.
             seed: Random seed for reproducibility.
-            steps: Number of inference steps (1-4 for SDXL-Turbo).
+            steps: Number of inference steps (20-50 recommended).
+            guidance_scale: CFG scale (5.0-10.0 recommended).
 
         Returns:
             PIL Image in RGBA mode.
@@ -51,14 +58,11 @@ class Text2ImageWorker:
         if self.pipe is None:
             self.load()
 
-        # SDXL-Turbo is distilled: guidance_scale must be 0.0, steps 1-4
-        steps = max(1, min(steps, 4))
-
         generator = torch.Generator(device=self.device).manual_seed(seed)
         image = self.pipe(
             prompt=prompt,
             num_inference_steps=steps,
-            guidance_scale=0.0,
+            guidance_scale=guidance_scale,
             generator=generator,
             width=1024,
             height=1024,
