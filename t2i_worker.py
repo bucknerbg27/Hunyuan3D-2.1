@@ -31,10 +31,12 @@ class Text2ImageWorker:
                 "Accept the license at https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers "
                 "and set HF_TOKEN to your HuggingFace access token."
             )
+        # Login globally so all sub-model downloads (text_encoder, vae, etc.) use the token
+        from huggingface_hub import login
+        login(token=self.token)
         self.pipe = StableDiffusion3Pipeline.from_pretrained(
             "stabilityai/stable-diffusion-3-medium-diffusers",
             torch_dtype=torch.float16,
-            token=self.token,
         )
         self.pipe.enable_model_cpu_offload()
         self.pipe.set_progress_bar_config(disable=True)
