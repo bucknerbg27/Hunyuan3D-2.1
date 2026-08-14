@@ -270,7 +270,7 @@ def _gen_shape(
     if image is None:
         start_time = time.time()
         try:
-            image = t2i_worker(caption, seed=seed)
+            image = t2i_worker(caption, seed=seed, steps=steps)
         except Exception as e:
             raise gr.Error(f"Text to 3D is disable. \
             Please enable it by `python gradio_app.py --enable_t23d`.")

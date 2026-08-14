@@ -37,12 +37,13 @@ class Text2ImageWorker:
         torch.cuda.empty_cache()
 
     @torch.inference_mode()
-    def __call__(self, prompt: str, seed: int = 0) -> Image.Image:
+    def __call__(self, prompt: str, seed: int = 0, steps: int = 4) -> Image.Image:
         """Generate an image from a text prompt.
 
         Args:
             prompt: Text description of the desired image.
             seed: Random seed for reproducibility.
+            steps: Number of inference steps (1-4 for SDXL-Turbo).
 
         Returns:
             PIL Image in RGBA mode.
@@ -50,11 +51,14 @@ class Text2ImageWorker:
         if self.pipe is None:
             self.load()
 
+        # SDXL-Turbo is distilled: guidance_scale must be 0.0, steps 1-4
+        steps = max(1, min(steps, 4))
+
         generator = torch.Generator(device=self.device).manual_seed(seed)
         image = self.pipe(
             prompt=prompt,
-            num_inference_steps=4,  # Turbo: 1-4 steps, 4 = best quality
-            guidance_scale=0.0,     # Turbo works best without CFG
+            num_inference_steps=steps,
+            guidance_scale=0.0,
             generator=generator,
             width=1024,
             height=1024,
