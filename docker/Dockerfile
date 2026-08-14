@@ -30,17 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------------------------------------
-# 2. Blender 4.0
-# -----------------------------------------------------------------------------
-RUN wget https://download.blender.org/release/Blender4.0/blender-4.0.2-linux-x64.tar.xz -O /tmp/blender.tar.xz && \
-    mkdir -p /opt/blender && \
-    tar -xvf /tmp/blender.tar.xz -C /opt/blender --strip-components=1 && \
-    rm /tmp/blender.tar.xz
-
-ENV PATH="/opt/blender:${PATH}"
-
-# -----------------------------------------------------------------------------
-# 3. Conda + Python 3.12
+# 2. Conda + Python 3.12
 # -----------------------------------------------------------------------------
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
     bash miniconda.sh -b -p /workspace/miniconda3 && \
@@ -73,6 +63,9 @@ RUN pip install --no-cache-dir /tmp/torch-*.whl /tmp/torchvision-*.whl /tmp/torc
 # -----------------------------------------------------------------------------
 # 6. Clone Repository
 # -----------------------------------------------------------------------------
+# CACHEBUST: change this value (or pass --build-arg CACHEBUST=$(date +%s)) to
+# force a fresh clone without rebuilding the expensive layers above.
+ARG CACHEBUST=1
 RUN rm -rf /workspace/Hunyuan3D-2.1 && \
     git clone -b dev/docker-fixes https://github.com/bucknerbg27/Hunyuan3D-2.1.git /workspace/Hunyuan3D-2.1
 WORKDIR /workspace/Hunyuan3D-2.1
