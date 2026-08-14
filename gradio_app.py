@@ -275,6 +275,9 @@ def _gen_shape(
             raise gr.Error(f"Text to 3D is disable. \
             Please enable it by `python gradio_app.py --enable_t23d`.")
         time_meta['text2image'] = time.time() - start_time
+        # Offload T2I model to free VRAM for 3D shape generation
+        t2i_worker.unload()
+        torch.cuda.empty_cache()
 
     # remove disk io to make responding faster, uncomment at your will.
     # image.save(os.path.join(save_folder, 'input.png'))
@@ -411,6 +414,7 @@ def generation_all(
         model_viewer_html_textured,
         stats,
         seed,
+        image,
     )
 
 @spaces.GPU(duration=60)
@@ -457,6 +461,7 @@ def shape_generation(
         model_viewer_html,
         stats,
         seed,
+        image,
     )
 
 
@@ -637,7 +642,7 @@ Fast for very complex cases, Standard seldom use.',
                 num_chunks,
                 randomize_seed,
             ],
-            outputs=[file_out, html_gen_mesh, stats, seed]
+            outputs=[file_out, html_gen_mesh, stats, seed, image]
         ).then(
             lambda: (gr.update(visible=False, value=False), gr.update(interactive=True), gr.update(interactive=True),
                      gr.update(interactive=False)),
@@ -664,7 +669,7 @@ Fast for very complex cases, Standard seldom use.',
                 num_chunks,
                 randomize_seed,
             ],
-            outputs=[file_out, file_out2, html_gen_mesh, stats, seed]
+            outputs=[file_out, file_out2, html_gen_mesh, stats, seed, image]
         ).then(
             lambda: (gr.update(visible=True, value=True), gr.update(interactive=False), gr.update(interactive=True),
                      gr.update(interactive=False)),

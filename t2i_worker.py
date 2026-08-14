@@ -1,16 +1,17 @@
 """
-Text-to-image worker using SDXL 1.0 base.
+Text-to-image worker using Stable Diffusion 3 Medium.
 
-Fits in ~7GB VRAM with model_cpu_offload. Designed to work alongside
+Fits in ~5GB VRAM with model_cpu_offload. Designed to work alongside
 the Hunyuan3D shape/texture pipelines within a 32GB budget.
+Unloaded after each generation to free VRAM for 3D models.
 """
 import torch
 from PIL import Image
-from diffusers import AutoPipelineForText2Image
+from diffusers import StableDiffusion3Pipeline
 
 
 class Text2ImageWorker:
-    """Text-to-image generation using SDXL 1.0 base with CPU offload."""
+    """Text-to-image generation using SD3 Medium with CPU offload."""
 
     def __init__(self, device: str = "cuda"):
         self.device = device
@@ -20,10 +21,9 @@ class Text2ImageWorker:
         """Load the pipeline with CPU offload to minimize VRAM."""
         if self.pipe is not None:
             return
-        self.pipe = AutoPipelineForText2Image.from_pretrained(
-            "stabilityai/stable-diffusion-xl-base-1.0",
+        self.pipe = StableDiffusion3Pipeline.from_pretrained(
+            "stabilityai/stable-diffusion-3-medium-diffusers",
             torch_dtype=torch.float16,
-            variant="fp16",
         )
         self.pipe.enable_model_cpu_offload()
         self.pipe.set_progress_bar_config(disable=True)
@@ -41,16 +41,16 @@ class Text2ImageWorker:
         self,
         prompt: str,
         seed: int = 0,
-        steps: int = 30,
-        guidance_scale: float = 7.5,
+        steps: int = 28,
+        guidance_scale: float = 7.0,
     ) -> Image.Image:
         """Generate an image from a text prompt.
 
         Args:
             prompt: Text description of the desired image.
             seed: Random seed for reproducibility.
-            steps: Number of inference steps (20-50 recommended).
-            guidance_scale: CFG scale (5.0-10.0 recommended).
+            steps: Number of inference steps (20-40 recommended for SD3).
+            guidance_scale: CFG scale (5.0-7.0 recommended for SD3).
 
         Returns:
             PIL Image in RGBA mode.
