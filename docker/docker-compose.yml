@@ -6,7 +6,8 @@ services:
     ports:
       - "8082:8080"
     environment:
-      - GRADIO_MCP_SERVER=True  
+      - GRADIO_MCP_SERVER=True
+      - HF_TOKEN=${HF_TOKEN}
     volumes:
       - J:\hunyuan_cache\huggingface:/root/.cache/huggingface
       - J:\hunyuan_cache\hy3dgen:/root/.cache/hy3dgen

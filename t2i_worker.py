@@ -4,7 +4,10 @@ Text-to-image worker using Stable Diffusion 3 Medium.
 Fits in ~5GB VRAM with model_cpu_offload. Designed to work alongside
 the Hunyuan3D shape/texture pipelines within a 32GB budget.
 Unloaded after each generation to free VRAM for 3D models.
+
+Requires HF_TOKEN env var (SD3 Medium is a gated model).
 """
+import os
 import torch
 from PIL import Image
 from diffusers import StableDiffusion3Pipeline
@@ -16,14 +19,22 @@ class Text2ImageWorker:
     def __init__(self, device: str = "cuda"):
         self.device = device
         self.pipe = None
+        self.token = os.environ.get("HF_TOKEN")
 
     def load(self):
         """Load the pipeline with CPU offload to minimize VRAM."""
         if self.pipe is not None:
             return
+        if not self.token:
+            raise RuntimeError(
+                "HF_TOKEN environment variable is required. "
+                "Accept the license at https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers "
+                "and set HF_TOKEN to your HuggingFace access token."
+            )
         self.pipe = StableDiffusion3Pipeline.from_pretrained(
             "stabilityai/stable-diffusion-3-medium-diffusers",
             torch_dtype=torch.float16,
+            token=self.token,
         )
         self.pipe.enable_model_cpu_offload()
         self.pipe.set_progress_bar_config(disable=True)

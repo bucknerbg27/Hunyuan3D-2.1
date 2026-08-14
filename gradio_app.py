@@ -511,7 +511,7 @@ def build_app():
                         _caption_state = gr.State(None)
                     with gr.Tab('Text Prompt', id='tab_txt_prompt', visible=HAS_T2I and not MV_MODE) as tab_tp:
                         caption = gr.Textbox(label='Text Prompt',
-                                             placeholder='SDXL-Turbo will be used to generate image.',
+                                             placeholder='SD3 Medium will generate the image, then 3D mesh is created.',
                                              info='Example: A 3D model of a cute cat, white background')
                     with gr.Tab('MultiView Prompt', visible=MV_MODE) as tab_mv:
                         # gr.Label('Please upload at least one front image.')
