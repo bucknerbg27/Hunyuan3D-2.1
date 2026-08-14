@@ -304,6 +304,9 @@ class FlowMatchEulerDiscreteScheduler(SchedulerMixin, ConfigMixin):
         sigma = self.sigmas[self.step_index].to(sample.device)
         sigma_next = self.sigmas[self.step_index + 1].to(sample.device)
 
+        # Ensure model_output is on the same device as sample (CPU offload may move it)
+        model_output = model_output.to(sample.device)
+
         prev_sample = sample + (sigma_next - sigma) * model_output
 
         # Cast sample back to model compatible dtype
