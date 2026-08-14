@@ -9,6 +9,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CUDA_HOME=/usr/local/cuda \
     CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
 
+ARG HF_TOKEN
+ENV HF_TOKEN=${HF_TOKEN}
+
 ENV PATH="${CUDA_HOME}/bin:${PATH}" \
     LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}"
 
