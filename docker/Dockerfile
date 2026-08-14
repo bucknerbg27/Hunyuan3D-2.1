@@ -81,7 +81,6 @@ COPY pkg_resources_shim.py /workspace/miniconda3/envs/hunyuan3d21/lib/python3.12
 RUN pip install --no-cache-dir ninja
 RUN pip install --no-cache-dir einops
 RUN pip install --no-cache-dir rembg
-RUN pip install --no-cache-dir realesrgan
 RUN pip install --no-cache-dir gradio
 RUN pip install --no-cache-dir cupy-cuda12x
 RUN pip install --no-cache-dir onnxruntime
@@ -90,7 +89,10 @@ RUN pip install --no-cache-dir onnxruntime
 COPY pymeshlab-*.whl /tmp/
 RUN pip install --no-cache-dir /tmp/pymeshlab-*.whl
 
-# Install basicsr
+# basicsr ships only as sdist (no wheel on PyPI) and its setup.py imports torch,
+# so pip's default isolated build re-downloads torch as a build dependency (slow).
+# Install with --no-build-isolation (torch already present) BEFORE realesrgan so
+# realesrgan's `basicsr>=1.4.2` dep is already satisfied and never rebuilt.
 RUN pip install --no-cache-dir --no-build-isolation basicsr==1.4.2
 
 # Install all remaining deps from local wheels (fast, no network)
