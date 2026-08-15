@@ -874,7 +874,7 @@ if __name__ == '__main__':
             #     texgen_worker.enable_model_cpu_offload()
 
             from hy3dpaint.textureGenPipeline import Hunyuan3DPaintPipeline, Hunyuan3DPaintConfig
-            conf = Hunyuan3DPaintConfig(max_num_view=8, resolution=768)
+            conf = Hunyuan3DPaintConfig(max_num_view=6, resolution=512)  # demo defaults: lower VRAM, negligible quality loss
             conf.realesrgan_ckpt_path = "hy3dpaint/ckpt/RealESRGAN_x4plus.pth"
             conf.multiview_cfg_path = "hy3dpaint/cfgs/hunyuan-paint-pbr.yaml"
             conf.custom_pipeline = "hy3dpaint/hunyuanpaintpbr"
