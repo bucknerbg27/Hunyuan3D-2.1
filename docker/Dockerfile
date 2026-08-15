@@ -41,40 +41,28 @@ RUN conda create -n hunyuan3d21 python=3.12 -c conda-forge -y && conda clean -a 
 ENV PATH="/workspace/miniconda3/envs/hunyuan3d21/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/workspace/miniconda3/envs/hunyuan3d21/lib:${LD_LIBRARY_PATH}"
 
-# Blender's Python 3.10 is incompatible with Python 3.12 (pkg_resources conflict).
-# bpy was replaced with trimesh, so Blender is not needed at all.
-# Remove it entirely to prevent sys.path contamination.
-RUN rm -rf /opt/blender
-
 # -----------------------------------------------------------------------------
-# 4. Build Tools
+# 3. Build Tools
 # -----------------------------------------------------------------------------
 RUN conda install -n hunyuan3d21 -c conda-forge ninja libstdcxx-ng -y && conda clean -a -y
 
 # -----------------------------------------------------------------------------
-# 5. Custom PyTorch wheels (Blackwell-compatible, from ComfyUI)
+# 4. Custom PyTorch wheels (Blackwell-compatible, from ComfyUI)
 # -----------------------------------------------------------------------------
-COPY torch-*.whl torchvision-*.whl torchaudio-*.whl /tmp/
+COPY docker/torch-*.whl docker/torchvision-*.whl docker/torchaudio-*.whl /tmp/
 RUN pip install --no-cache-dir /tmp/torch-*.whl /tmp/torchvision-*.whl /tmp/torchaudio-*.whl
 
 # -----------------------------------------------------------------------------
-# 6. Clone Repository
+# 5. Install Python Dependencies (BEFORE clone so these layers cache)
 # -----------------------------------------------------------------------------
-# CACHEBUST: change this value (or pass --build-arg CACHEBUST=$(date +%s)) to
-# force a fresh clone without rebuilding the expensive layers above.
-ARG CACHEBUST=1
-RUN rm -rf /workspace/Hunyuan3D-2.1 && \
-    git clone -b dev/docker-fixes https://github.com/bucknerbg27/Hunyuan3D-2.1.git /workspace/Hunyuan3D-2.1
-WORKDIR /workspace/Hunyuan3D-2.1
+# requirements.txt is copied from the repo root (build context is repo root).
+COPY requirements.txt /tmp/requirements.txt
 
-# -----------------------------------------------------------------------------
-# 7. Install Python Dependencies
-# -----------------------------------------------------------------------------
 RUN pip install --no-cache-dir wheel setuptools pybind11
 
 # setuptools>=70 removed pkg_resources, but lightning_fabric (pytorch-lightning 1.9.5) imports it.
 # Provide a minimal shim that exposes declare_namespace.
-COPY pkg_resources_shim.py /workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/pkg_resources.py
+COPY docker/pkg_resources_shim.py /workspace/miniconda3/envs/hunyuan3d21/lib/python3.12/site-packages/pkg_resources.py
 RUN pip install --no-cache-dir ninja
 RUN pip install --no-cache-dir einops
 RUN pip install --no-cache-dir rembg
@@ -83,7 +71,7 @@ RUN pip install --no-cache-dir cupy-cuda12x
 RUN pip install --no-cache-dir onnxruntime
 
 # Install pymeshlab from pre-built wheel
-COPY pymeshlab-*.whl /tmp/
+COPY docker/pymeshlab-*.whl /tmp/
 RUN pip install --no-cache-dir /tmp/pymeshlab-*.whl
 
 # basicsr ships only as sdist (no wheel on PyPI) and its setup.py imports torch,
@@ -93,11 +81,21 @@ RUN pip install --no-cache-dir /tmp/pymeshlab-*.whl
 RUN pip install --no-cache-dir --no-build-isolation basicsr==1.4.2
 
 # Install all remaining deps from local wheels (fast, no network)
-COPY wheels/ /tmp/wheels/
-RUN pip install --no-cache-dir --find-links /tmp/wheels/ -r requirements.txt
+COPY docker/wheels/ /tmp/wheels/
+RUN pip install --no-cache-dir --find-links /tmp/wheels/ -r /tmp/requirements.txt
 
 # -----------------------------------------------------------------------------
-# 8. Pre-built CUDA extensions (from ComfyUI-3D-Pack)
+# 6. Clone Repository (only this + downstream layers rebuild on code changes)
+# -----------------------------------------------------------------------------
+# CACHEBUST: change this value (or pass --build-arg CACHEBUST=$(date +%s)) to
+# force a fresh clone without rebuilding the expensive layers above.
+ARG CACHEBUST=1
+RUN rm -rf /workspace/Hunyuan3D-2.1 && \
+    git clone -b dev/docker-fixes https://github.com/bucknerbg27/Hunyuan3D-2.1.git /workspace/Hunyuan3D-2.1
+WORKDIR /workspace/Hunyuan3D-2.1
+
+# -----------------------------------------------------------------------------
+# 7. Pre-built CUDA extensions (from ComfyUI-3D-Pack)
 # -----------------------------------------------------------------------------
 # Build custom_rasterizer from source (against CUDA 13)
 RUN cd hy3dpaint/custom_rasterizer && \
@@ -110,13 +108,13 @@ RUN cd hy3dpaint/DifferentiableRenderer && \
     bash compile_mesh_painter.sh
 
 # -----------------------------------------------------------------------------
-# 9. RealESRGAN Weights
+# 8. RealESRGAN Weights
 # -----------------------------------------------------------------------------
 RUN mkdir -p hy3dpaint/ckpt && \
     wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -P hy3dpaint/ckpt
 
 # -----------------------------------------------------------------------------
-# 11. Final Setup
+# 9. Final Setup
 # -----------------------------------------------------------------------------
 RUN mkdir -p gradio_cache && echo "conda activate hunyuan3d21" >> ~/.bashrc
 RUN ln -sf /usr/local/cuda/lib64/libcudart.so.13.0 /usr/local/cuda/lib64/libcudart.so.12 && \

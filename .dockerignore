@@ -1,0 +1,27 @@
+# VCS
+.git
+.gitignore
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Source code (cloned at build time, not needed in the build context)
+hy3dshape/
+hy3dpaint/
+assets/
+
+# Generated output / caches
+gradio_cache/
+save_dir/
+*.glb
+*.obj
+*.ply
+*.stl
+
+# Secrets
+.env
+docker/.env
+
+# Docs
+docker/README.md
