@@ -279,6 +279,10 @@ def _gen_shape(
         t2i_worker.unload()
         torch.cuda.empty_cache()
 
+    # Yield the image immediately so the UI shows it while 3D generation runs.
+    main_image = image if not MV_MODE else image['front']
+    yield main_image, seed
+
     # remove disk io to make responding faster, uncomment at your will.
     # image.save(os.path.join(save_folder, 'input.png'))
     if MV_MODE:
@@ -323,7 +327,7 @@ def _gen_shape(
 
     stats['time'] = time_meta
     main_image = image if not MV_MODE else image['front']
-    return mesh, main_image, save_folder, stats, seed
+    yield mesh, main_image, save_folder, stats, seed
 
 @spaces.GPU(duration=60)
 def generation_all(
@@ -342,7 +346,7 @@ def generation_all(
     randomize_seed: bool = False,
 ):
     start_time_0 = time.time()
-    mesh, image, save_folder, stats, seed = _gen_shape(
+    gen = _gen_shape(
         caption,
         image,
         mv_image_front=mv_image_front,
@@ -357,6 +361,11 @@ def generation_all(
         num_chunks=num_chunks,
         randomize_seed=randomize_seed,
     )
+    # First yield: image is ready -> show it immediately in the Image Prompt tab.
+    main_image, seed = next(gen)
+    yield (gr.update(), gr.update(), gr.update(), gr.update(), seed, main_image)
+
+    mesh, image, save_folder, stats, seed = next(gen)
     path = export_mesh(mesh, save_folder, textured=False)
     
 
@@ -408,7 +417,7 @@ def generation_all(
                                                          width=HTML_WIDTH, textured=True)
     if args.low_vram_mode:
         torch.cuda.empty_cache()
-    return (
+    yield (
         gr.update(value=path),
         gr.update(value=glb_path_textured),
         model_viewer_html_textured,
@@ -434,7 +443,7 @@ def shape_generation(
     randomize_seed: bool = False,
 ):
     start_time_0 = time.time()
-    mesh, image, save_folder, stats, seed = _gen_shape(
+    gen = _gen_shape(
         caption,
         image,
         mv_image_front=mv_image_front,
@@ -449,6 +458,12 @@ def shape_generation(
         num_chunks=num_chunks,
         randomize_seed=randomize_seed,
     )
+    # First yield: image is ready -> show it immediately in the Image Prompt tab.
+    main_image, seed = next(gen)
+    yield (gr.update(), gr.update(), gr.update(), seed, main_image)
+
+    # Second yield: mesh is ready.
+    mesh, image, save_folder, stats, seed = next(gen)
     stats['time']['total'] = time.time() - start_time_0
     mesh.metadata['extras'] = stats
 
@@ -456,7 +471,7 @@ def shape_generation(
     model_viewer_html = build_model_viewer_html(save_folder, height=HTML_HEIGHT, width=HTML_WIDTH)
     if args.low_vram_mode:
         torch.cuda.empty_cache()
-    return (
+    yield (
         gr.update(value=path),
         model_viewer_html,
         stats,
