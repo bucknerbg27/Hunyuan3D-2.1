@@ -121,4 +121,4 @@ RUN ln -sf /usr/local/cuda/lib64/libcudart.so.13.0 /usr/local/cuda/lib64/libcuda
     ldconfig
 
 EXPOSE 8080
-CMD ["/bin/bash", "-c", "source /workspace/miniconda3/etc/profile.d/conda.sh && conda activate hunyuan3d21 && exec python gradio_app.py --enable_t23d --low_vram_mode"]
+CMD ["/bin/bash", "-c", "source /workspace/miniconda3/etc/profile.d/conda.sh && conda activate hunyuan3d21 && exec python gradio_app.py --enable_t23d"]
