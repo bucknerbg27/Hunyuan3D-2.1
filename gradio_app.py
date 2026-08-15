@@ -275,9 +275,11 @@ def _gen_shape(
             raise gr.Error(f"Text to 3D is disable. \
             Please enable it by `python gradio_app.py --enable_t23d`.")
         time_meta['text2image'] = time.time() - start_time
-        # Offload T2I model to free VRAM for 3D shape generation
-        t2i_worker.unload()
-        torch.cuda.empty_cache()
+        # Only offload T2I when VRAM-constrained; otherwise keep it loaded so
+        # subsequent text-to-image calls don't need to reload weights.
+        if args.low_vram_mode:
+            t2i_worker.unload()
+            torch.cuda.empty_cache()
 
     # Yield the image immediately so the UI shows it while 3D generation runs.
     main_image = image if not MV_MODE else image['front']
@@ -498,9 +500,10 @@ def generate_image_only(
         image = t2i_worker(caption, seed=seed, steps=steps, guidance_scale=guidance_scale)
     except Exception as e:
         raise gr.Error(f"Text-to-image failed: {e}")
-    # Offload T2I model to free VRAM for 3D shape generation
-    t2i_worker.unload()
-    torch.cuda.empty_cache()
+    # Only offload T2I when VRAM-constrained; otherwise keep it loaded.
+    if args.low_vram_mode:
+        t2i_worker.unload()
+        torch.cuda.empty_cache()
     return image, seed
 
 
