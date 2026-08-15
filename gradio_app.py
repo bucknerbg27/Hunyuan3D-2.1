@@ -901,12 +901,16 @@ if __name__ == '__main__':
     if args.enable_t23d:
         try:
             from t2i_worker import Text2ImageWorker
+            # Lazy-load: do NOT call load() here. SD3 Medium (~5GB) + texture
+            # (~21GB) + shape (~10GB) = ~36GB would exceed the 32GB budget and
+            # OOM-kill the container at startup. The worker loads on first use
+            # (its __call__ does `if self.pipe is None: self.load()`), and is
+            # unloaded again after each generation.
             t2i_worker = Text2ImageWorker(device=args.device)
-            t2i_worker.load()
             HAS_T2I = True
-            print("Text-to-image worker loaded (SDXL-Turbo)")
+            print("Text-to-image worker ready (lazy-load on first use)")
         except Exception as e:
-            print(f"Warning: Failed to load text-to-image worker: {e}")
+            print(f"Warning: Failed to init text-to-image worker: {e}")
             print("Text-to-3D will be unavailable.")
             HAS_T2I = False
 
