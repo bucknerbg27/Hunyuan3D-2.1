@@ -465,6 +465,30 @@ def shape_generation(
     )
 
 
+@spaces.GPU(duration=60)
+def generate_image_only(
+    caption=None,
+    steps=30,
+    guidance_scale=7.0,
+    seed=1234,
+    randomize_seed: bool = False,
+):
+    """Generate only the image from a text prompt, so the user can review it
+    before committing to 3D generation. The image is returned to the Image
+    Prompt component; the user then clicks Gen Shape / Gen Textured Shape."""
+    if caption is None or caption == "":
+        raise gr.Error("Please provide a text prompt.")
+    seed = int(randomize_seed_fn(seed, randomize_seed))
+    try:
+        image = t2i_worker(caption, seed=seed, steps=steps, guidance_scale=guidance_scale)
+    except Exception as e:
+        raise gr.Error(f"Text-to-image failed: {e}")
+    # Offload T2I model to free VRAM for 3D shape generation
+    t2i_worker.unload()
+    torch.cuda.empty_cache()
+    return image, seed
+
+
 def build_app():
     title = 'Hunyuan3D-2: High Resolution Textured 3D Assets Generation'
     if MV_MODE:
@@ -531,6 +555,12 @@ def build_app():
                     btn_all = gr.Button(value='Gen Textured Shape',
                                         variant='primary',
                                         visible=HAS_TEXTUREGEN,
+                                        min_width=100)
+
+                with gr.Row():
+                    btn_img = gr.Button(value='Generate Image (Preview)',
+                                        variant='secondary',
+                                        visible=HAS_T2I and not MV_MODE,
                                         min_width=100)
 
                 with gr.Group():
@@ -624,6 +654,16 @@ Fast for very complex cases, Standard seldom use.',
         tab_ip.select(fn=lambda: gr.update(selected='tab_img_gallery'), outputs=gallery)
         if HAS_T2I:
             tab_tp.select(fn=lambda: gr.update(selected='tab_txt_gallery'), outputs=gallery)
+
+        if HAS_T2I:
+            btn_img.click(
+                generate_image_only,
+                inputs=[caption, num_steps, cfg_scale, seed, randomize_seed],
+                outputs=[image, seed],
+            ).then(
+                lambda: gr.update(selected='tab_img_prompt'),
+                outputs=[tabs_prompt],
+            )
 
         btn.click(
             shape_generation,
